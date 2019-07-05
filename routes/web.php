@@ -23,4 +23,5 @@ Route::get('/document', 'DocumentController@index')->name('get-documents');
 Route::get('/document/create','DocumentController@create')->name('create-document');
 Route::post('/document', 'DocumentController@store')->name('store-document');
 Route::get('/document/{document}','DocumentController@show')->name('show-document');
-Route::post('/document/{document}/launch','DocumentController@launch')->name('launch-document');
+Route::post('/document/{document}/processinline','DocumentController@processinline')->name('processinline-document');
+Route::post('/document/{document}/processfile','DocumentController@processfile')->name('processfile-document');

@@ -10,7 +10,7 @@
       {{ $document->name }}
     </dd>
   </dl>
-  <form action="{{ route('launch-document',$document) }}" method="post" enctype="multipart/form-data">
+  <form action="{{ route('processfile-document',$document) }}" method="post" enctype="multipart/form-data">
     {{ csrf_field() }}
     <div class="form-group row">
       <label class="col-form-label col-sm-2">Data File</label>
@@ -21,7 +21,24 @@
     </div>
     <div class="form-group row">
       <div class="col">
-        <button class="btn btn-primary" type="submit">Process</button>
+        <button class="btn btn-primary" type="submit">Process File</button>
+      </div>
+    </div>
+  </form>
+
+  <form action="{{ route('processinline-document',$document) }}" method="post">
+    {{ csrf_field() }}
+    <div class="form-group row">
+      <label class="col-form-label col-sm-2">File Name</label>
+      <input type="text" class="form-control col-sm-4" name="outputfilename">
+    </div>
+    <div class="form-group row">
+      <label class="col-form-label col-sm-2">Data</label>
+      <textarea class="form-control col-sm-4" name="data"></textarea>
+    </div>
+    <div class="form-group row">
+      <div class="col">
+        <button class="btn btn-primary" type="submit">Process Inline</button>
       </div>
     </div>
   </form>

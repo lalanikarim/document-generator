@@ -101,46 +101,70 @@ class DocumentController extends Controller
         //
     }
 
-    public function launch(Request $request, Document $document)
+    public function processinline(Request $request, Document $document)
     {
-        $outputFleName = $request->datafile->getClientOriginalName();
-        $outputFleName = rtrim($outputFleName,'.');
-        $extension = $request->datafile->getClientOriginalExtension();
-        if(strlen($extension) > 0 && strlen($outputFleName) > strlen($extension) + 1)
+        $outputFileName = $request->outputfilename;
+        $data = $request->data;
+        if(substr($data,strlen($data) - 1) != '\n')
         {
-            $outputFleName = substr($outputFleName,0,strlen($outputFleName) - strlen($extension) - 1);
+            $data = $data . PHP_EOL;
+        }
+        return $this->process($document, $data, $outputFileName);
+    }
+
+    public function processfile(Request $request, Document $document)
+    {
+        $outputFileName = $request->datafile->getClientOriginalName();
+        $outputFileName = rtrim($outputFileName,'.');
+        $extension = $request->datafile->getClientOriginalExtension();
+        if(strlen($extension) > 0 && strlen($outputFileName) > strlen($extension) + 1)
+        {
+            $outputFileName = substr($outputFileName,0,strlen($outputFileName) - strlen($extension) - 1);
         }
 
-        $disk = Storage::disk('local');
-        $zint = env('ZINT_BIN');
-        $process = new Process([$zint,'--mirror','--notext','--batch','-i',$request->datafile->path()]);
+        $data = file_get_contents($request->datafile->path());
+        return $this->process($document, $data, $outputFileName);
+    }
 
-        if(!$disk->exists('output')){
+    /**
+     * @param Request $request
+     * @param string $data
+     * @param $outputFileName
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     */
+    private function process(Document $document, string $data, string $outputFileName)
+    {
+        $disk = Storage::disk('local');
+
+        if (!$disk->exists('output')) {
             $disk->makeDirectory('output');
         }
         $outputPath = $disk->path('output');
         $disk->deleteDirectory($document->id);
         $disk->makeDirectory($document->id);
         $path = $disk->path($document->id);
+        $disk->put($document->id . "/data.txt", $data);
+
+        $zint = env('ZINT_BIN');
+        $process = new Process([$zint, '--mirror', '--notext', '--batch', '-i', $disk->path($document->id . "/data.txt")]);
+
+
         $process->setWorkingDirectory($path);
         $process->setEnv(['LD_LIBRARY_PATH' => env('ZINT_LIB')]);
         $process->run();
 
-        if(!$process->isSuccessful())
-        {
+        if (!$process->isSuccessful()) {
             throw new ProcessFailedException($process);
         }
 
-        $data = file_get_contents($request->datafile->path());
-
-        $lines = explode(PHP_EOL,$data);
+        $lines = explode(PHP_EOL, $data);
 
         $dom = new \DOMDocument();
         $root = $dom->createElement('document');
 
         $dom->appendChild($root);
         foreach ($lines as $line) {
-            if(strlen(trim($line)) > 0) {
+            if (strlen(trim($line)) > 0) {
                 $tag = $dom->createElement('tag');
                 $id = $dom->createAttribute('id');
                 $id->value = trim($line);
@@ -151,21 +175,18 @@ class DocumentController extends Controller
 
         $dom->save($path . "/data.xml");
 
-        $disk->put($document->id . "/data.txt",$data);
-
         $fop = env('FOP_BIN');
-        $process = new Process([$fop,'--noconfig','-xsl',$disk->path($document->file),'-xml',$path . "/data.xml",$outputPath . "/" . $outputFleName . ".pdf"]);
-        $process->setEnv(['JAVA_HOME' => env('JAVA_HOME'),'FOP_HOME' => env( 'FOP_HOME')]);
+        $process = new Process([$fop, '--noconfig', '-xsl', $disk->path($document->file), '-xml', $path . "/data.xml", $outputPath . "/" . $outputFileName . ".pdf"]);
+        $process->setEnv(['JAVA_HOME' => env('JAVA_HOME'), 'FOP_HOME' => env('FOP_HOME')]);
 
         $process->run();
 
-        if(!$process->isSuccessful())
-        {
+        if (!$process->isSuccessful()) {
             throw new ProcessFailedException($process);
         }
 
         $disk->deleteDirectory($document->id);
 
-        return response()->download($outputPath . "/" . $outputFleName . ".pdf")->deleteFileAfterSend();
+        return response()->download($outputPath . "/" . $outputFileName . ".pdf")->deleteFileAfterSend();
     }
 }
