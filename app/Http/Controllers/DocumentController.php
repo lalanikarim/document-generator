@@ -103,12 +103,27 @@ class DocumentController extends Controller
 
     public function launch(Request $request, Document $document)
     {
+        $outputFleName = $request->datafile->getClientOriginalName();
+        $outputFleName = rtrim($outputFleName,'.');
+        $extension = $request->datafile->getClientOriginalExtension();
+        if(strlen($extension) > 0 && strlen($outputFleName) > strlen($extension) + 1)
+        {
+            $outputFleName = substr($outputFleName,0,strlen($outputFleName) - strlen($extension) - 1);
+        }
+
         $disk = Storage::disk('local');
-        $process = new Process(['zint','--mirror','--notext','--batch','-i',$request->datafile->path()]);
+        $zint = env('ZINT_BIN');
+        $process = new Process([$zint,'--mirror','--notext','--batch','-i',$request->datafile->path()]);
+
+        if(!$disk->exists('output')){
+            $disk->makeDirectory('output');
+        }
+        $outputPath = $disk->path('output');
         $disk->deleteDirectory($document->id);
         $disk->makeDirectory($document->id);
         $path = $disk->path($document->id);
         $process->setWorkingDirectory($path);
+        $process->setEnv(['LD_LIBRARY_PATH' => env('ZINT_LIB')]);
         $process->run();
 
         if(!$process->isSuccessful())
@@ -138,8 +153,8 @@ class DocumentController extends Controller
 
         $disk->put($document->id . "/data.txt",$data);
 
-        $fop = env('FOP_HOME') . '/fop';
-        $process = new Process([$fop,'--noconfig','-xsl',$disk->path($document->file),'-xml',$path . "/data.xml",$path . "/output.pdf"]);
+        $fop = env('FOP_BIN');
+        $process = new Process([$fop,'--noconfig','-xsl',$disk->path($document->file),'-xml',$path . "/data.xml",$outputPath . "/" . $outputFleName . ".pdf"]);
         $process->setEnv(['JAVA_HOME' => env('JAVA_HOME'),'FOP_HOME' => env( 'FOP_HOME')]);
 
         $process->run();
@@ -149,13 +164,8 @@ class DocumentController extends Controller
             throw new ProcessFailedException($process);
         }
 
-        $originalName = $request->datafile->getClientOriginalName();
-        $originalName = rtrim($originalName,'.');
-        $extension = $request->datafile->getClientOriginalExtension();
-        if(strlen($extension) > 0 && strlen($originalName) > strlen($extension) + 1)
-        {
-            $originalName = substr($originalName,0,strlen($originalName) - strlen($extension) - 1);
-        }
-        return response()->download($path . "/output.pdf",$originalName . ".pdf")->deleteFileAfterSend();
+        $disk->deleteDirectory($document->id);
+
+        return response()->download($outputPath . "/" . $outputFleName . ".pdf")->deleteFileAfterSend();
     }
 }
