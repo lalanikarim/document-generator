@@ -103,6 +103,10 @@ class DocumentController extends Controller
 
     public function processinline(Request $request, Document $document)
     {
+        $request->validate([
+            'outputfilename' => 'required',
+            'data' => 'required'
+        ]);
         $outputFileName = $request->outputfilename;
         $data = $request->data;
         if(substr($data,strlen($data) - 1) != '\n')
@@ -114,6 +118,9 @@ class DocumentController extends Controller
 
     public function processfile(Request $request, Document $document)
     {
+        $request->validate([
+            'datafile' => 'file|required|field:Data File'
+        ]);
         $outputFileName = $request->datafile->getClientOriginalName();
         $outputFileName = rtrim($outputFileName,'.');
         $extension = $request->datafile->getClientOriginalExtension();

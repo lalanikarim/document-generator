@@ -145,6 +145,10 @@ return [
     |
     */
 
-    'attributes' => [],
+    'attributes' => [
+        'datafile' => 'Data File',
+        'outputfilename' => 'File Name',
+        'data' => 'Data'
+    ],
 
 ];
